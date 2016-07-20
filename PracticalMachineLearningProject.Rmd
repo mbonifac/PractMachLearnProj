@@ -1,0 +1,90 @@
+#Practical Machine Learning Final Project
+
+## Synopsis:
+
+Accelerometer data from participants performing barbell lifts five different ways was collected to 
+create a model that was used to predict the classe of barbell lift for twenty sets of acceleromter data.
+
+## Data Cleaning:
+
+A training set and testing set were obtained from http://groupware.les.inf.puc-rio.br/har 
+under the Weight Lifting Exercise data set.
+
+The training set is from http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+The testing set of twenty sets of data for which a classe is to be predicted is from
+http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+Before the prediction can be made, the training set is divided into a smaller training set (75%)
+and validation set (25%)
+
+```{r echo=TRUE}
+setwd("C:/Users/mbonifac/Desktop/Coursera/R_Portfolio")
+trainmaster<-read.csv("./pml-training.csv")
+#Remove the columns that are blank or have NA
+working_train<-trainmaster[lapply(trainmaster,function(x) sum(is.na(x))/length(x))<0.1]
+working_train[working_train == ""] <- NA
+working_train<-working_train[lapply(working_train,function(x) sum(is.na(x))/length(x))<0.1]
+
+#Remove columns that are known to not affect classe, (row number, user_name, raw_timestamp_part_1, 
+#raw_timestamp_part_2, cvtd_timestamp, new_window, num_window)
+working_train<-working_train[,-c(1:7)]
+
+#Divide data into a training set and a validation set (75% training/25% validation)
+library(caret)
+library(kernlab)
+set.seed(125)
+inTrain<-createDataPartition(y=working_train$classe, p=0.75, list=FALSE)
+train_train<-working_train[inTrain,]
+train_validate<-working_train[-inTrain,]
+```
+
+The testing set is prepared in the same manner as the working_train set with unnecessary columns removed.
+
+```{r echo=TRUE}
+testmaster<-read.csv("./pml-testing.csv")
+
+#Remove the columns that are blank or have NA
+working_test<-testmaster[lapply(testmaster,function(x) sum(is.na(x))/length(x))<0.1]
+working_test[working_test == ""] <- NA
+working_test<-working_test[lapply(working_test,function(x) sum(is.na(x))/length(x))<0.1]
+
+#Remove columns that are known to not affect classe, (row number, user_name, raw_timestamp_part_1, 
+#raw_timestamp_part_2, cvtd_timestamp, new_window, num_window)
+working_test<-working_test[,-c(1:7)]
+```
+
+## Determination of Model:
+
+The first model to attempt is the decision tree.
+
+```{r echo=TRUE}
+model_tree<-train(classe~.,method="rpart",data=train_train)
+library(rattle)
+fancyRpartPlot(model_tree$finalModel)
+```
+
+The decision tree model does not appear to identify classe D.  Predict using the train_validate set to confirm.
+
+```{r echo=TRUE}
+valid_tree<-predict(model_tree,newdata=train_validate)
+confusionMatrix(valid_tree,train_validate$classe)
+```
+
+The accuracy of the decision tree model is low.  The boosted model is then tried.
+
+```{r echo=TRUE}
+model_boost<-train(classe~.,method="gbm",data=train_train, verbose=FALSE)
+valid_boost<-predict(model_boost,newdata=train_validate)
+confusionMatrix(valid_boost,train_validate$classe)
+```
+
+## Prediction
+
+With a much higher accuracy, the boosted model is considered for prediction of the working_test set.
+The boosted model is used to predict classe for the data in working_test.
+
+```{r echo=TRUE}
+test_prediction<-predict(model_boost,newdata=working_test)
+Prediction_Results<-data.frame(prediction=test_prediction)
+Prediction_Results
+```
